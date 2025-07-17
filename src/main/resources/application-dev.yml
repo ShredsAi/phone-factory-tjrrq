@@ -1,0 +1,126 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:procurement_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8082
+      client:
+        registration:
+          supplier-service:
+            client-id: dev-client
+            client-secret: dev-secret
+            authorization-grant-type: client_credentials
+          auth-service:
+            client-id: dev-client
+            client-secret: dev-secret
+            authorization-grant-type: client_credentials
+
+logging:
+  level:
+    ai.shreds: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.security: DEBUG
+    org.springframework.kafka: DEBUG
+    org.apache.kafka: INFO
+
+external:
+  supplier-management:
+    url: http://localhost:8081/api
+    validation-endpoint: /internal/v1/suppliers/{supplierId}/validate-item
+    info-endpoint: /internal/v1/suppliers/{supplierId}
+    catalog-endpoint: /internal/v1/catalog/material/{materialId}/price
+  auth-service:
+    url: http://localhost:8082/api
+    validate-approval-endpoint: /v1/auth/validate-approval
+    user-level-endpoint: /v1/users/{userId}/approval-level
+  notification:
+    url: http://localhost:8083/api
+    send-notification-endpoint: /v1/notifications
+  email-service:
+    url: http://localhost:8084/api
+    send-email-endpoint: /v1/emails/send-with-attachment
+    send-notification-endpoint: /v1/emails/send
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+
+mock:
+  external-services: true
+  supplier-service:
+    enable: true
+    validation-response:
+      isAvailable: true
+      currentPrice: 29.85
+      currency: USD
+      leadTimeDays: 7
+  auth-service:
+    enable: true
+    validation-response:
+      isAuthorized: true
+      userLevel: MANAGER
+  notification-service:
+    enable: true
+  email-service:
+    enable: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      supplierService:
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        waitDurationInOpenState: 5s
+      authService:
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        waitDurationInOpenState: 5s
+  retry:
+    instances:
+      supplierService:
+        maxAttempts: 2
+      emailService:
+        maxAttempts: 2
+
+approval:
+  thresholds:
+    supervisor: 5000.00
+    manager: 25000.00
+    director: 100000.00

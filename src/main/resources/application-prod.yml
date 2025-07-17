@@ -1,0 +1,210 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:procurement_db}
+    username: ${DB_USERNAME:procurement_user}
+    password: ${DB_PASSWORD:procurement_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      idle-timeout: 30000
+      connection-timeout: 20000
+      validation-timeout: 5000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc.batch_size: 100
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: procurement-workflow-consumer
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: ai.shreds.shared.dtos,com.procurement.workflow
+        max.poll.interval.ms: 300000
+        max.poll.records: 50
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: 5
+        batch.size: 32768
+        retries: 3
+        acks: all
+        compression.type: snappy
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVICE_ISSUER_URI:https://auth-service:8082}
+          jwk-set-uri: ${AUTH_SERVICE_JWK_URI:https://auth-service:8082/.well-known/jwks.json}
+      client:
+        registration:
+          supplier-service:
+            client-id: ${SUPPLIER_SERVICE_CLIENT_ID:procurement-service}
+            client-secret: ${SUPPLIER_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+          auth-service:
+            client-id: ${AUTH_SERVICE_CLIENT_ID:procurement-service}
+            client-secret: ${AUTH_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+        provider:
+          supplier-service:
+            token-uri: ${SUPPLIER_SERVICE_TOKEN_URI:https://auth-service:8082/oauth/token}
+          auth-service:
+            token-uri: ${AUTH_SERVICE_TOKEN_URI:https://auth-service:8082/oauth/token}
+
+logging:
+  level:
+    root: INFO
+    ai.shreds: INFO
+    org.springframework: WARN
+    org.hibernate.SQL: WARN
+    org.apache.kafka: WARN
+  file:
+    name: /var/log/procurement-workflow.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+external:
+  supplier-management:
+    url: ${SUPPLIER_SERVICE_URL:https://supplier-service:8081/api}
+    validation-endpoint: /internal/v1/suppliers/{supplierId}/validate-item
+    info-endpoint: /internal/v1/suppliers/{supplierId}
+    catalog-endpoint: /internal/v1/catalog/material/{materialId}/price
+    timeout: 30s
+  auth-service:
+    url: ${AUTH_SERVICE_URL:https://auth-service:8082/api}
+    validate-approval-endpoint: /v1/auth/validate-approval
+    user-level-endpoint: /v1/users/{userId}/approval-level
+    timeout: 15s
+  notification:
+    url: ${NOTIFICATION_SERVICE_URL:https://notification-service:8083/api}
+    send-notification-endpoint: /v1/notifications
+    timeout: 10s
+  email-service:
+    url: ${EMAIL_SERVICE_URL:https://email-service:8084/api}
+    send-email-endpoint: /v1/emails/send-with-attachment
+    send-notification-endpoint: /v1/emails/send
+    timeout: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+    diskspace:
+      enabled: true
+    db:
+      enabled: true
+
+security:
+  oauth2:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      supplierService:
+        registerHealthIndicator: true
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: 5s
+      authService:
+        registerHealthIndicator: true
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: 3s
+      notificationService:
+        registerHealthIndicator: true
+        slidingWindowSize: 15
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 20s
+        failureRateThreshold: 60
+        eventConsumerBufferSize: 10
+      emailService:
+        registerHealthIndicator: true
+        slidingWindowSize: 15
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 20s
+        failureRateThreshold: 60
+        eventConsumerBufferSize: 10
+  retry:
+    instances:
+      supplierService:
+        maxAttempts: 3
+        waitDuration: 2s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+      authService:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+      emailService:
+        maxAttempts: 3
+        waitDuration: 2s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+
+approval:
+  thresholds:
+    supervisor: ${APPROVAL_THRESHOLD_SUPERVISOR:5000.00}
+    manager: ${APPROVAL_THRESHOLD_MANAGER:25000.00}
+    director: ${APPROVAL_THRESHOLD_DIRECTOR:100000.00}
+
+kafka:
+  topics:
+    reorder-request: ${KAFKA_TOPIC_REORDER_REQUEST:ReorderRequestInitiated}
+    purchase-order-transmitted: ${KAFKA_TOPIC_PO_TRANSMITTED:PurchaseOrderTransmitted}

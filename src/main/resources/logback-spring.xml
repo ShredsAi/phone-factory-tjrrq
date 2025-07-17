@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOGS" value="${LOG_PATH:-./logs}" />
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%blue(%X{requestId:--})][%thread] %cyan(%logger{35}) : %msg%n%throwable" />
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:--}][%thread] %logger{35} : %msg%n%throwable" />
+
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="RollingFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/procurement-workflow.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/archived/procurement-workflow-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Async appender for improved performance - wraps file appender -->
+    <appender name="AsyncFile" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="RollingFile" />
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <!-- JSON appender for structured logs in production -->
+    <appender name="JsonFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/procurement-workflow-json.log</file>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeContext>false</includeContext>
+            <includeMdc>true</includeMdc>
+            <customFields>{"application":"procurement-workflow-shred"}</customFields>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/archived/procurement-workflow-json-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Default loggers -->
+    <logger name="ai.shreds" level="DEBUG" additivity="false">
+        <appender-ref ref="Console" />
+        <appender-ref ref="AsyncFile" />
+    </logger>
+    
+    <logger name="org.springframework" level="INFO" />
+    <logger name="org.hibernate" level="INFO" />
+    <logger name="org.apache.kafka" level="INFO" />
+    
+    <!-- Request logging for tracking -->
+    <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="DEBUG" />
+
+    <!-- Dev profile configuration -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="Console" />
+            <appender-ref ref="AsyncFile" />
+        </root>
+        
+        <logger name="ai.shreds" level="DEBUG" additivity="false">
+            <appender-ref ref="Console" />
+            <appender-ref ref="AsyncFile" />
+        </logger>
+        
+        <logger name="org.springframework" level="INFO" />
+        <logger name="org.springframework.web" level="DEBUG" />
+        <logger name="org.springframework.security" level="DEBUG" />
+        <logger name="org.springframework.kafka" level="DEBUG" />
+        <logger name="org.hibernate.SQL" level="DEBUG" />
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" />
+    </springProfile>
+
+    <!-- Prod profile configuration -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="Console" />
+            <appender-ref ref="AsyncFile" />
+            <appender-ref ref="JsonFile" />
+        </root>
+        
+        <logger name="ai.shreds" level="INFO" additivity="false">
+            <appender-ref ref="Console" />
+            <appender-ref ref="AsyncFile" />
+            <appender-ref ref="JsonFile" />
+        </logger>
+        
+        <!-- Reduce noise in production logs -->
+        <logger name="org.springframework" level="WARN" />
+        <logger name="org.hibernate" level="WARN" />
+        <logger name="org.apache.kafka" level="WARN" />
+        
+        <!-- Keep these at INFO for essential monitoring -->
+        <logger name="org.springframework.kafka.listener.KafkaMessageListenerContainer" level="INFO" />
+        <logger name="org.springframework.kafka.listener.LoggingErrorHandler" level="INFO" />
+    </springProfile>
+
+    <!-- Docker profile (for containerized environments) -->
+    <springProfile name="docker">
+        <root level="INFO">
+            <appender-ref ref="Console" />
+        </root>
+        
+        <logger name="ai.shreds" level="INFO" additivity="false">
+            <appender-ref ref="Console" />
+        </logger>
+    </springProfile>
+</configuration>
