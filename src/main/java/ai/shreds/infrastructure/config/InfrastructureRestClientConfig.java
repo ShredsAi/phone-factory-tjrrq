@@ -52,7 +52,7 @@ public class InfrastructureRestClientConfig {
     private ClientHttpRequestFactory clientHttpRequestFactory() {
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
         factory.setConnectTimeout(10000); // 10 seconds
-        factory.setReadTimeout(30000);    // 30 seconds
+        // Read timeout is set via RestTemplateBuilder
         factory.setConnectionRequestTimeout(5000); // 5 seconds
         return factory;
     }

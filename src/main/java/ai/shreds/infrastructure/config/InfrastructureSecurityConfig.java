@@ -9,8 +9,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.client.OAuth2RestTemplate;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.web.SecurityFilterChain;
@@ -51,12 +49,12 @@ public class InfrastructureSecurityConfig {
                 .requestMatchers("/api/v1/procurement/orders/**").authenticated()
                 .anyRequest().authenticated()
             );
-            
+
         // Configure OAuth2 resource server if issuer URI is provided
         if (issuerUri != null && !issuerUri.isEmpty()) {
             http.oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         }
-            
+
         return http.build();
     }
 

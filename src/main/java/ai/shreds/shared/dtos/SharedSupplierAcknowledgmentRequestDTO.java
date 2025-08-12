@@ -22,6 +22,13 @@ import java.util.List;
 public class SharedSupplierAcknowledgmentRequestDTO {
     
     /** 
+     * Supplier identifier who is sending the acknowledgment 
+     */
+    @NotBlank(message = "Supplier ID cannot be blank")
+    @Size(min = 1, max = 50, message = "Supplier ID must be between 1 and 50 characters")
+    private String supplierId;
+    
+    /** 
      * Supplier order identifier from supplier system 
      */
     @NotBlank(message = "Supplier order ID cannot be blank")

@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.util.concurrent.ListenableFuture;
-import org.springframework.util.concurrent.ListenableFutureCallback;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.retry.annotation.Backoff;
 
@@ -14,6 +12,7 @@ import ai.shreds.shared.dtos.SharedPurchaseOrderTransmittedEventDTO;
 
 import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -38,13 +37,6 @@ public class AdapterPurchaseOrderKafkaProducer implements ApplicationKafkaOutput
         this.sendTimeoutMs = sendTimeoutMs;
     }
 
-    /**
-     * Publishes a purchase order transmitted event to Kafka.
-     * Implements retry capability for transient errors with exponential backoff.
-     * 
-     * @param event The purchase order transmitted event to publish
-     * @throws RuntimeException if publishing fails after all retries
-     */
     @Override
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
     public void publishPurchaseOrderTransmitted(SharedPurchaseOrderTransmittedEventDTO event) {
@@ -55,29 +47,22 @@ public class AdapterPurchaseOrderKafkaProducer implements ApplicationKafkaOutput
         if (event.getOrderId() == null || event.getOrderId().trim().isEmpty()) {
             throw new IllegalArgumentException("Order ID cannot be null or empty");
         }
-        
-        log.info("Publishing purchase order transmitted event for order: {}", event.getOrderId());
-        
-        try {
-            // Use the order ID as the message key to ensure all events for the same order go to the same partition
-            ListenableFuture<SendResult<String, Object>> future = kafkaTemplate.send(purchaseOrderTopic, event.getOrderId(), event);
-            
-            // Add callback for async handling
-            future.addCallback(new ListenableFutureCallback<SendResult<String, Object>>() {
-                @Override
-                public void onSuccess(SendResult<String, Object> result) {
-                    log.info("Successfully published PO transmitted event for order: {} to partition: {}", 
-                            event.getOrderId(), result.getRecordMetadata().partition());
-                }
 
-                @Override
-                public void onFailure(Throwable ex) {
+        log.info("Publishing purchase order transmitted event for order: {}", event.getOrderId());
+
+        try {
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(purchaseOrderTopic, event.getOrderId(), event);
+
+            future.whenComplete((result, ex) -> {
+                if (ex == null) {
+                    log.info("Successfully published PO transmitted event for order: {} to partition: {}",
+                        event.getOrderId(), result.getRecordMetadata().partition());
+                } else {
                     log.error("Failed to publish PO transmitted event for order: {}", event.getOrderId(), ex);
                 }
             });
-            
+
             // Optionally wait for the result with timeout to ensure delivery within a time frame
-            // This makes the method synchronous but with a bounded wait time
             try {
                 future.get(sendTimeoutMs, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -88,7 +73,7 @@ public class AdapterPurchaseOrderKafkaProducer implements ApplicationKafkaOutput
             } catch (TimeoutException e) {
                 throw new RuntimeException("Timeout publishing purchase order transmitted event", e);
             }
-            
+
         } catch (Exception e) {
             log.error("Error publishing PO transmitted event for order: {}", event.getOrderId(), e);
             throw new RuntimeException("Failed to publish purchase order transmitted event", e);

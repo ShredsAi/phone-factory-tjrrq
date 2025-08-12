@@ -31,6 +31,29 @@ public class InfrastructureExternalServiceException extends RuntimeException {
     }
 
     /**
+     * Constructor with service name and error message
+     * @param serviceName the name of the external service
+     * @param message the error message
+     */
+    public InfrastructureExternalServiceException(String serviceName, String message) {
+        super(message);
+        this.serviceName = serviceName;
+        this.errorCode = "EXTERNAL_SERVICE_ERROR";
+    }
+
+    /**
+     * Constructor with service name, error message, and cause
+     * @param serviceName the name of the external service
+     * @param message the error message
+     * @param cause the underlying exception cause
+     */
+    public InfrastructureExternalServiceException(String serviceName, String message, Throwable cause) {
+        super(message, cause);
+        this.serviceName = serviceName;
+        this.errorCode = "EXTERNAL_SERVICE_ERROR";
+    }
+
+    /**
      * Full constructor with service name and error code
      * @param message the error message
      * @param cause the underlying exception cause

@@ -91,8 +91,8 @@ public class ApplicationApprovalWorkflowService implements ApplicationApprovalIn
             throw new ApplicationInvalidApprovalException("Approver ID must be provided");
         }
         
-        // Get order value for authority check (this is simplified - would get real value from repository)
-        BigDecimal orderValue = new BigDecimal("10000.00"); // Placeholder
+        // Get order value for authority check (simplified - would get real value from repository)
+        DomainMonetaryAmount orderValue = new DomainMonetaryAmount(new BigDecimal("10000.00"), "USD"); // Placeholder
         
         // Check authorization through domain layer
         boolean isAuthorized = domainAuthorizationPort.validateApprovalAuthority(

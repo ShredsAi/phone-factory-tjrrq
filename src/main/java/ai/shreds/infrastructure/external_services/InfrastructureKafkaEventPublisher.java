@@ -7,8 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
-import org.springframework.util.concurrent.ListenableFuture;
-import org.springframework.util.concurrent.ListenableFutureCallback;
+
+import java.util.concurrent.CompletableFuture;
 
 @Component
 public class InfrastructureKafkaEventPublisher implements ApplicationKafkaOutputPort {
@@ -25,28 +25,22 @@ public class InfrastructureKafkaEventPublisher implements ApplicationKafkaOutput
     @Override
     public void publishPurchaseOrderTransmitted(SharedPurchaseOrderTransmittedEventDTO event) {
         try {
-            ListenableFuture<SendResult<String, Object>> future = kafkaTemplate.send(
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(
                     purchaseOrderTopic,
                     event.getOrderId(), // Use orderId as message key for partitioning
                     event
             );
 
-            future.addCallback(new ListenableFutureCallback<SendResult<String, Object>>() {
-                @Override
-                public void onSuccess(SendResult<String, Object> result) {
-                    // Log success or handle success scenario
-                    System.out.println("Successfully published PurchaseOrderTransmitted event for order: " + event.getOrderId());
-                }
-
-                @Override
-                public void onFailure(Throwable ex) {
+            future.whenComplete((result, ex) -> {
+                if (ex != null) {
                     throw new InfrastructureKafkaException(
                             "Failed to publish PurchaseOrderTransmitted event for order: " + event.getOrderId(),
                             ex
                     );
+                } else {
+                    System.out.println("Successfully published PurchaseOrderTransmitted event for order: " + event.getOrderId());
                 }
             });
-
         } catch (Exception e) {
             throw new InfrastructureKafkaException(
                     "Failed to publish PurchaseOrderTransmitted event for order: " + event.getOrderId(),

@@ -41,17 +41,17 @@ public class ApplicationOrderModificationService implements ApplicationModificat
             
             // Create response
             SharedModificationResponseDTO response = new SharedModificationResponseDTO();
-            response.setStatus(result.isSuccess() ? "MODIFIED" : "FAILED");
+            response.setStatus(result.getSuccess() != null && result.getSuccess() ? "MODIFIED" : "FAILED");
             response.setOrderId(orderId);
-            response.setRequiresReapproval(result.isRequiresReapproval());
+            response.setRequiresReapproval(result.getRequiresReapproval() != null && result.getRequiresReapproval());
             
             // If reapproval is required, restart approval workflow
-            if (result.isRequiresReapproval()) {
+            if (result.getRequiresReapproval() != null && result.getRequiresReapproval()) {
                 restartApprovalWorkflow(orderId, result.getNewTotalAmount());
             }
             
             log.info("Order modification processed successfully for order: {}, requires reapproval: {}", 
-                    orderId, result.isRequiresReapproval());
+                    orderId, result.getRequiresReapproval());
             
             return response;
             
